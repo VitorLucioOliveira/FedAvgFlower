@@ -25,12 +25,12 @@ serverapp = "fed_avg.server_app:app"
 clientapp = "fed_avg.client_app:app"
 
 [tool.flwr.app.config]
-num-server-rounds = 3
-fraction-fit = 0.5
-local-epochs = 1
+num-server-rounds = 50
+fraction-fit = 0.1
+local-epochs = 5
 
 [tool.flwr.federations]
 default = "local-simulation"
 
 [tool.flwr.federations.local-simulation]
-options.num-supernodes = 10 #num_participantes
+options.num-supernodes = 100 #num_participantes

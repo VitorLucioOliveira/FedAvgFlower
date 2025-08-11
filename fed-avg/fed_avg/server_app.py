@@ -47,9 +47,9 @@ def handle_fit_metrics(metrics: List[Tuple[int, Metrics]])-> Metrics:
 
 def on_fit_config(server_round: int) -> Metrics:
     """Alterar o learning rate, baseado no round"""
-    lr = 0.01
-    if server_round > 2:
-        lr = 0.01
+    lr = 0.005
+    # if server_round > 30:
+    #     lr = 0.005
     return {"lr": lr}
 
 
@@ -62,7 +62,7 @@ def server_fn(context: Context):
     ndarrays = get_weights(Net())
     parameters = ndarrays_to_parameters(ndarrays)
 
-    #Load global test set
+    # Load global test set
     testset = load_dataset("uoft-cs/cifar10")["test"]
     testloader = DataLoader(testset.with_transform(get_transform()))
 
@@ -70,10 +70,10 @@ def server_fn(context: Context):
     strategy = FedAvg(
         fraction_fit=fraction_fit,
         fraction_evaluate=1.0,
-        min_available_clients=2,
+        min_available_clients=10,
         initial_parameters=parameters,
         evaluate_metrics_aggregation_fn=weighted_avarage,#returna a accuracy media dos modelos
-        fit_metrics_aggregation_fn=handle_fit_metrics,#retorna metricas extras por round
+        # fit_metrics_aggregation_fn=handle_fit_metrics,#retorna metricas extras por round
         on_fit_config_fn=on_fit_config,#mudar configurações durante os rounds
         # evaluate_fn= get_avaluate_fn(testloader, device="cpu"),#avaliar modelo global
     )
