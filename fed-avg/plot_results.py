@@ -14,15 +14,16 @@ with open("pyproject.toml", "rb") as f:
     config = tomllib.load(f)
 
 # --- Configurações ---
-NUM_PARTITIONS = 100
+NUM_PARTITIONS = config["tool"]["flwr"]["federations"]["local-simulation"]["options"]["num-supernodes"]
 LOG_FILE_PATH = "simulation_log.txt"
-OUTPUT_DIR = "out-put"
-DATASET = "cifar10"
+
+DATASET = "zalando-datasets/fashion_mnist"
 ALPHA = 100
 EPOCHS = config["tool"]["flwr"]["app"]["config"]["local-epochs"]
 CLIENT_FIT = config["tool"]["flwr"]["app"]["config"]["fraction-fit"]
 ROUNDS = config["tool"]["flwr"]["app"]["config"]["num-server-rounds"]
 
+OUTPUT_DIR = f"out-put/C{NUM_PARTITIONS}_A{ALPHA}_E{EPOCHS}_CF{CLIENT_FIT}"
 
 
 def clean_ansi_codes(text):
@@ -146,7 +147,7 @@ def plot_metrics_from_log():
     plt.xlabel("Round")
     plt.ylabel("Acurácia")
     plt.grid(True)
-    acc_path = os.path.join(OUTPUT_DIR, f"accuracy_vs_rounds({ROUNDS}-{CLIENT_FIT}-{EPOCHS}).png")
+    acc_path = os.path.join(OUTPUT_DIR, "accuracy_vs_rounds.png")
     plt.savefig(acc_path)
     plt.close()
 
@@ -157,7 +158,7 @@ def plot_metrics_from_log():
     plt.xlabel("Round")
     plt.ylabel("Loss")
     plt.grid(True)
-    loss_path = os.path.join(OUTPUT_DIR, f"loss_vs_rounds({ROUNDS}-{CLIENT_FIT}-{EPOCHS}).png")
+    loss_path = os.path.join(OUTPUT_DIR, "loss_vs_rounds.png")
     plt.savefig(loss_path)
     plt.close()
 

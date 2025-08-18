@@ -63,7 +63,7 @@ def server_fn(context: Context):
     parameters = ndarrays_to_parameters(ndarrays)
 
     # Load global test set
-    testset = load_dataset("uoft-cs/cifar10")["test"]
+    testset = load_dataset("zalando-datasets/fashion_mnist")["test"]
     testloader = DataLoader(testset.with_transform(get_transform()))
 
     # Define strategy
