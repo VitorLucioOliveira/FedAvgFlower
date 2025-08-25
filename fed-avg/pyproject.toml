@@ -18,7 +18,7 @@ dependencies = [
 packages = ["."]
 
 [tool.flwr.app]
-publisher = "vitor"
+publisher = "vitor lucio de oliveira"
 
 [tool.flwr.app.components]
 serverapp = "fed_avg.server_app:app"
