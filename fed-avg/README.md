@@ -1,63 +1,157 @@
-# fed-avg: A Flower / PyTorch app
+# Fed-Avg: Aplicação de Federated Learning com Flower e PyTorch
 
-## Install dependencies and project
+Este projeto implementa um sistema de **Federated Learning** usando o framework **Flower** e **PyTorch**, aplicado ao dataset **Fashion MNIST**. O sistema permite executar simulações de aprendizado federado com diferentes configurações de hiperparâmetros e gerar visualizações dos resultados.
+
+## 🚀 Instalação e Configuração
+
+### Pré-requisitos
+
+- Python 3.8+
+- pip
+
+### Instalação das dependências
 
 ```bash
 pip install -e .
 ```
 
-## Como rodar a simulação principal e gerar gráficos
+## 📁 Estrutura do Projeto
 
-### 1. Executando a simulação principal (FedAvg)
+```
+fed-avg/
+├── fed_avg/                 # Código principal da aplicação
+│   ├── __init__.py
+│   ├── client_app.py        # Implementação do cliente federado
+│   ├── server_app.py        # Implementação do servidor federado
+│   └── task.py              # Configurações da tarefa de ML
+├── out-put/                 # Pasta de saída dos resultados
+├── plot_results.py          # Script para geração de gráficos
+├── run_experiments.py       # Script para execução de múltiplos experimentos
+├── pyproject.toml           # Configurações do projeto
+└── README.md
+```
 
-Para rodar a simulação principal do FedAvg, utilize o comando abaixo. Ele executa a simulação usando o Flower e salva toda a saída (logs) no arquivo `simulation_log.txt`:
+## 🔬 Executando Experimentos
+
+### 1. Simulação Única (FedAvg)
+
+Para executar uma simulação única do FedAvg:
 
 ```bash
 flwr run . > simulation_log.txt 2>&1
 ```
 
-### 2. Gerando os gráficos a partir do log
+### 2. Múltiplos Experimentos com Otimização Aleatória
 
-Após rodar a simulação, execute o script para gerar os gráficos:
+O arquivo `run_experiments.py` permite executar múltiplos experimentos com diferentes combinações de hiperparâmetros de forma automatizada:
+
+#### Funcionalidades:
+
+- **Otimização Aleatória**: Seleciona aleatoriamente valores de hiperparâmetros de listas predefinidas
+- **Execução Automatizada**: Roda múltiplas simulações consecutivas
+- **Logging Automático**: Salva automaticamente os logs de cada simulação
+- **Geração de Gráficos**: Chama automaticamente o script de plotagem após cada simulação
+
+#### Hiperparâmetros Configuráveis:
+
+- **`fraction_fit`**: Fração de clientes que participam por rodada (0.1 a 1.0)
+- **`local_epochs`**: Número de épocas locais de treinamento (1 a 20)
+- **`learning_rate`**: Taxa de aprendizado (0.001 a 0.01)
+- **`batch_size`**: Tamanho do batch (10 a 50)
+
+#### Uso:
 
 ```bash
-python plot_results.py
+python run_experiments.py
 ```
 
-O script irá:
+Por padrão, executa experimentos com combinações aleatórias de hiperparâmetros.
 
-- Ler as configurações do `pyproject.toml`
-- Gerar e salvar os gráficos na pasta de saída correspondente aos parâmetros da simulação.
+### 3. Geração de Gráficos e Análise
 
-### 3. Base de Dados Utilizada
+O arquivo `plot_results.py` é responsável por processar os logs das simulações e gerar visualizações completas:
 
-O código utiliza o dataset **Fashion MNIST** (via `zalando-datasets/fashion_mnist`), que contém imagens de roupas classificadas em 10 categorias.
+#### Funcionalidades Principais:
 
-### 4. Gráficos Gerados
+##### **Análise de Distribuição de Dados:**
 
-Ao rodar o `plot_results.py`, serão gerados os seguintes gráficos:
+- Gera gráficos mostrando como os rótulos do Fashion MNIST são distribuídos entre os clientes
+- Utiliza partição Dirichlet com alpha configurável (padrão: 100)
+- Visualiza o grau de heterogeneidade dos dados entre clientes
 
-- **Distribuição de Rótulos por Cliente** (`label_distribution_alpha_X.png`): mostra como as classes do dataset foram distribuídas entre os clientes após a partição (útil para visualizar o grau de heterogeneidade dos dados).
-- **Acurácia vs. Rounds** (`accuracy_vs_rounds.png`): mostra a evolução da acurácia média do modelo global ao longo das rodadas de federated learning.
-- **Loss vs. Rounds** (`loss_vs_rounds.png`): mostra a evolução da função de perda média ao longo das rodadas.
+##### **Processamento de Métricas:**
 
-Os arquivos são salvos na pasta `out-put/`, em um subdiretório que indica os principais parâmetros da simulação.
+- Extrai automaticamente métricas de loss e acurácia dos logs de simulação
+- Limpa códigos ANSI e formata os dados para análise
+- Calcula estatísticas como melhor loss/acurácia e rounds correspondentes
 
-### 5. Significado do Nome da Pasta de Saída
+##### **Geração de Gráficos:**
 
-O nome da pasta de saída segue o padrão:
+- **Acurácia vs. Rounds**: Evolução da acurácia média ao longo das rodadas
+- **Loss vs. Rounds**: Evolução da função de perda ao longo das rodadas
+- **Distribuição de Rótulos**: Visualização da heterogeneidade dos dados
+
+##### **Organização de Resultados:**
+
+- Cria pastas organizadas por parâmetros da simulação
+- Salva resultados em CSV para análise posterior
+- Nomenclatura automática: `CF{fraction_fit}_E{epochs}_BS{batch_size}_LR{learning_rate}`
+
+`
+
+## 📈 Interpretação dos Resultados
+
+### Estrutura das Pastas de Saída
 
 ```
-C{NUM_PARTITIONS}_A{ALPHA}_E{EPOCHS}_CF{CLIENT_FIT}
+out-put/
+├── CF0.4_E15_BS33_LR0.01/     # Exemplo de pasta de resultados
+│   ├── accuracy_vs_rounds.png
+│   └── loss_vs_rounds.png
+└── results_summary.csv          # Resumo consolidado de todos os experimentos
 ```
 
-Onde:
+### Significado dos Parâmetros:
 
-- **C**: Número de clientes/partições (ex: `C100` = 100 clientes)
-- **A**: Valor de alpha usado na partição de Dirichlet (ex: `A0.1` = alpha 0.1, controla o grau de heterogeneidade)
-- **E**: Número de épocas locais de treinamento em cada cliente (ex: `E5` = 5 épocas)
-- **CF**: Fração de clientes selecionados por rodada (ex: `CF0.1` = 10% dos clientes participam por rodada)
+- **CF**: Client Fraction (fração de clientes por rodada)
+- **E**: Local Epochs (épocas locais de treinamento)
+- **BS**: Batch Size (tamanho do batch)
+- **LR**: Learning Rate (taxa de aprendizado)
 
-Exemplo:
-`out-put/C100_A0.1_E5_CF0.1`
-significa: 100 clientes, alpha=0.1, 5 épocas locais, 10% dos clientes participando por rodada.
+## 🔧 Personalização
+
+### Modificando Parâmetros dos Experimentos
+
+Edite `run_experiments.py` para alterar:
+
+- Número de experimentos (`num_testes`)
+- Ranges dos hiperparâmetros
+- Estratégia de seleção de parâmetros
+
+### Configurações do Dataset
+
+Modifique `plot_results.py` para ajustar:
+
+- Valor de alpha para partição Dirichlet
+- Número de partições
+- Dataset utilizado
+
+## 📝 Logs e Debugging
+
+- **Logs de Simulação**: Salvos em `simulation_log.txt`
+- **Logs de Plotagem**: Exibidos no console durante execução
+- **Tratamento de Erros**: Inclui verificações robustas para arquivos e dados
+
+## 🤝 Contribuição
+
+Para contribuir com o projeto:
+
+1. Fork o repositório
+2. Crie uma branch para sua feature
+3. Commit suas mudanças
+4. Push para a branch
+5. Abra um Pull Request
+
+## 📄 Licença
+
+Este projeto está sob a licença MIT. Veja o arquivo LICENSE para mais detalhes.
