@@ -1,29 +1,21 @@
 import re
 import matplotlib.pyplot as plt
-import seaborn as sns
 import pandas as pd
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import DirichletPartitioner
 from flwr_datasets.visualization import plot_label_distributions
-import sys
-import subprocess
 import os
 import tomllib
+import csv
 
 with open("pyproject.toml", "rb") as f:
     config = tomllib.load(f)
 
 # --- Configurações ---
-NUM_PARTITIONS = config["tool"]["flwr"]["federations"]["local-simulation"]["options"]["num-supernodes"]
-LOG_FILE_PATH = "simulation_log.txt"
 
 DATASET = "zalando-datasets/fashion_mnist"
 ALPHA = 100
-EPOCHS = config["tool"]["flwr"]["app"]["config"]["local-epochs"]
-CLIENT_FIT = config["tool"]["flwr"]["app"]["config"]["fraction-fit"]
-ROUNDS = config["tool"]["flwr"]["app"]["config"]["num-server-rounds"]
-
-OUTPUT_DIR = f"out-put/C{NUM_PARTITIONS}_A{ALPHA}_E{EPOCHS}_CF{CLIENT_FIT}"
+NUM_PARTITIONS = 100
 
 
 def clean_ansi_codes(text):
@@ -32,7 +24,7 @@ def clean_ansi_codes(text):
     return ansi_escape.sub('', text)
 
 
-def plot_partition_label_distribution():
+def plot_partition_label_distribution(output_dir):
     """
     Cria e salva um gráfico mostrando a distribuição de rótulos de dados
     em cada partição (cliente), garantindo que os nomes dos rótulos apareçam.
@@ -74,7 +66,7 @@ def plot_partition_label_distribution():
         fig.tight_layout(rect=[0, 0, 0.99, 1])
 
         distribution_filename = f"label_distribution_alpha_{ALPHA}.png"
-        full_path = os.path.join(OUTPUT_DIR, distribution_filename)
+        full_path = os.path.join(output_dir, distribution_filename)
         plt.savefig(full_path, bbox_inches='tight')
         print(f"Gráfico de distribuição de rótulos salvo em: '{full_path}'")
         plt.close(fig)
@@ -83,17 +75,21 @@ def plot_partition_label_distribution():
         print(f"Erro ao gerar o gráfico de distribuição de rótulos: {e}")
 
 
-def plot_metrics_from_log():
+def plot_metrics_from_log(log_file_path, fraction_fit, local_epochs, batch_size, learning_rate ):
     """
     Lê o log, extrai métricas e salva os gráficos na pasta de saída.
     """
-    print("\nGerando gráficos de métricas a partir do log...")
+    output_dir = (f"out-put/CF{fraction_fit}"
+                   f"_E{local_epochs}"
+                   f"_BS{batch_size}"
+                   f"_LR{learning_rate}")
 
+    os.makedirs(output_dir, exist_ok=True)
     try:
-        with open(LOG_FILE_PATH, "r", encoding="utf-8") as f:
+        with open(log_file_path, "r", encoding="utf-8") as f:
             raw_content = f.read()
     except FileNotFoundError:
-        print(f"Erro: O arquivo '{LOG_FILE_PATH}' não foi encontrado.")
+        print(f"Erro: O arquivo '{log_file_path}' não foi encontrado.")
         return
 
     log_content = clean_ansi_codes(raw_content)
@@ -107,13 +103,11 @@ def plot_metrics_from_log():
         loss_section = loss_section_match.group(1)
         loss_matches = re.findall(r"round (\d+): ([\d.]+)", loss_section)
 
-        # --- CORREÇÃO APLICADA AQUI ---
         # Extrai a seção de Acurácia
         accuracy_section_match = re.search(r"History \(metrics, distributed, evaluate\):([\s\S]*)", log_content)
         if not accuracy_section_match:
             raise AttributeError("Seção de Acurácia não encontrada.")
         accuracy_section = accuracy_section_match.group(1)
-        # Encontra todos os pares (round, acurácia) dentro da seção, ignorando o resto
         accuracy_matches = re.findall(r"\((\d+), ([\d.]+)\)", accuracy_section)
 
     except AttributeError as e:
@@ -126,7 +120,6 @@ def plot_metrics_from_log():
 
     rounds = [int(r) for r, _ in loss_matches]
     losses = [float(l) for _, l in loss_matches]
-    # A acurácia já vem em pares (round, valor), então pegamos só o valor
     accuracies = [float(a) for _, a in accuracy_matches]
 
     min_len = min(len(rounds), len(losses), len(accuracies))
@@ -140,39 +133,80 @@ def plot_metrics_from_log():
         "Accuracy": accuracies[:min_len]
     })
 
-    # Gráfico de Acurácia
+    # --- Estatísticas ---
+    best_loss = metrics_df["Loss"].min()
+    best_loss_round = metrics_df.loc[metrics_df["Loss"].idxmin(), "Round"]
+    final_loss = metrics_df["Loss"].iloc[-1]
+
+    best_acc = metrics_df["Accuracy"].max()
+    best_acc_round = metrics_df.loc[metrics_df["Accuracy"].idxmax(), "Round"]
+    final_acc = metrics_df["Accuracy"].iloc[-1]
+
+    # --- Gráfico de Acurácia ---
     plt.figure(figsize=(10, 6))
     plt.plot(metrics_df["Round"], metrics_df["Accuracy"], marker="o", linestyle="-", color="b")
     plt.title(f"Acurácia Média por Round")
     plt.xlabel("Round")
     plt.ylabel("Acurácia")
     plt.grid(True)
-    acc_path = os.path.join(OUTPUT_DIR, "accuracy_vs_rounds.png")
+
+    # Textos
+    plt.text(0.92, 1.1, f"Best: {best_acc:.2f} (Round {best_acc_round})",
+             transform=plt.gca().transAxes, fontsize=10, color="green", ha="left")
+    plt.text(0.92, 1.05, f"Final: {final_acc:.2f}",
+             transform=plt.gca().transAxes, fontsize=10, color="blue", ha="left")
+
+    acc_path = os.path.join(output_dir, "accuracy_vs_rounds.png")
     plt.savefig(acc_path)
     plt.close()
 
-    # Gráfico de Loss
+    # --- Gráfico de Loss ---
     plt.figure(figsize=(10, 6))
     plt.plot(metrics_df["Round"], metrics_df["Loss"], marker="o", linestyle="-", color="r")
     plt.title(f"Loss Médio por Round")
     plt.xlabel("Round")
     plt.ylabel("Loss")
     plt.grid(True)
-    loss_path = os.path.join(OUTPUT_DIR, "loss_vs_rounds.png")
+
+    # Textos
+    plt.text(0.92, 1.1, f"Best: {best_loss:.2f} (Round {best_loss_round})",
+             transform=plt.gca().transAxes, fontsize=10, color="green", ha="left")
+    plt.text(0.92, 1.05, f"Final: {final_loss:.2f}",
+             transform=plt.gca().transAxes, fontsize=10, color="blue", ha="left")
+
+    loss_path = os.path.join(output_dir, "loss_vs_rounds.png")
     plt.savefig(loss_path)
     plt.close()
 
-    print(f"Gráficos de acurácia e loss salvos em: '{OUTPUT_DIR}'")
+    # --- Salvar resultados finais em CSV ---
+    results_csv = os.path.join("out-put", "results_summary.csv")
+
+    # Verifica se já existe
+    file_exists = os.path.isfile(results_csv)
+
+    with open(results_csv, mode="a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+
+        # Se o arquivo acabou de ser criado, escreve o cabeçalho
+        if not file_exists:
+            writer.writerow([
+                "clients", "rounds", "fraction_fit", "local_epochs",
+                "batch_size", "learning_rate",
+                "best_loss", "final_loss",
+                "best_acc", "final_acc"
+            ])
+
+        # Adiciona a linha de resultados
+        writer.writerow([
+            NUM_PARTITIONS, len(rounds), fraction_fit, local_epochs,
+            batch_size, learning_rate,
+            round(best_loss, 4), round(final_loss, 4),
+            round(best_acc, 4), round(final_acc, 4)
+        ])
+
+    print(f"Linha adicionada à tabela em: '{results_csv}'")
+
+    print(f"Gráficos de acurácia e loss salvos em: '{output_dir}'")
 
 
-if __name__ == "__main__":
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    try:
-        import seaborn
-    except ImportError:
-        print("Instalando bibliotecas de plotagem (seaborn, matplotlib)...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "seaborn", "matplotlib"])
-
-    plot_partition_label_distribution()
-    plot_metrics_from_log()

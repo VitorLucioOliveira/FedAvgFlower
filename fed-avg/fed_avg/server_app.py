@@ -45,18 +45,19 @@ def handle_fit_metrics(metrics: List[Tuple[int, Metrics]])-> Metrics:
     return {"max_b": max(b_values)}
 
 
-def on_fit_config(server_round: int) -> Metrics:
-    """Alterar o learning rate, baseado no round"""
-    lr = 0.005
-    # if server_round > 30:
-    #     lr = 0.005
-    return {"lr": lr}
 
 
 def server_fn(context: Context):
     # Read from config
     num_rounds = context.run_config["num-server-rounds"]
     fraction_fit = context.run_config["fraction-fit"]
+
+    def on_fit_config(server_round: int) -> Metrics:
+        """Alterar o learning rate, baseado no round"""
+        lr = context.run_config["learning-rate"]
+        # if server_round > 30:
+        #     lr = 0.005
+        return {"lr": lr}
 
     # Initialize model parameters
     ndarrays = get_weights(Net())
